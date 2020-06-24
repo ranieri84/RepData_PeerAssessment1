@@ -7,19 +7,112 @@ output:
 
 
 ## Loading and preprocessing the data
-
-
+As the file is zipped, we will use the function as argument into read.table
+```{r}
+data <- read.csv(unz("activity.zip", "activity.csv"), header=T)
+head(data)
+```
+Converting Date strings into R date format
+```{r}
+data$date <- as.Date(data$date,"%Y-%m-%d")
+```
 
 ## What is mean total number of steps taken per day?
+Let´s remove the NA values for this analysis
+```{r}
+sdata<-data[!is.na(data$steps),]
+```
+Calculating number of steps for each day
+```{r}
+steps_per_day<-tapply(sdata$steps, sdata$date, sum)
+head(steps_per_day)
+
+```
+Creating the histogram
+```{r}
+hist(steps_per_day,breaks = 10, xlab = "Steps per Day", 
+     main = "Frequency of Number of Steps per day")
+```
 
 
-
+Sumarizing the mean and meadian total steps per day
+```{r}
+summary(steps_per_day)
+```
 ## What is the average daily activity pattern?
+Let´s calculate the average steps by each interval
+```{r}
+steps_per_interval<-tapply(sdata$steps, sdata$interval, mean)
+head(steps_per_interval)
 
+```
+Making a timeseries plot
+```{r}
+xnames <- names(steps_per_interval)
+plot(steps_per_interval, type='l', xlab="5-min Interval",xaxt='n',
+     ylab = "Average Steps",main = "Average steps by 5 minues interval")
+axis(1,at = seq(1,288,by=48),labels=xnames[seq(1,288,by=48)])
 
+```
+
+The time on which maximun number of steps occurs can be found by
+```{r}
+xnames[which.max(steps_per_interval)]
+```
 
 ## Imputing missing values
+Let´s Calculate and report the total number of missing values in the dataset 
+```{r}
+sum(is.na(data))
+```
+Create a new dataset with missing values replaced by the mean of that interval
+```{r}
+index<-is.na(data)
+data2<-data
+data2[index,"steps"]<-steps_per_interval[match(data[index,"interval"],xnames)]
+```
+Calculate the new steps by day with replaced missing values and build the histogram
+```{r}
+steps_per_day2<-tapply(data2$steps, data2$date, sum)
+hist(steps_per_day2,breaks = 10, xlab = "Steps per Day", 
+     main = "Frequency of Number of Steps per day")
+```
 
+The histogram looks like excalty the same shape as before,but with higher frequencies.
+Let's summarize both data with and without missing values to see  the differences
+```{r}
+summary(steps_per_day)
+summary(steps_per_day2)
+## Show in a Table
+data.frame(Mean = rbind(mean(steps_per_day),mean(steps_per_day2)),
+               Median = rbind(median(steps_per_day),median(steps_per_day2)),
+               row.names = c("w/NA","w/o NA"))
 
+```
+We can see that there is no significant difference if we include the mean values of the time interval as missing data. As expected the mean is still de same, and a slightly change on Median Values 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+Let´s create a factor with two levels, for weekdays and weekdends
+```{r}
+weekends <- c("Saturday","Sunday")
+data2$Weekdays<-factor(weekdays(data2$date) %in% weekends,
+                       labels = c("Weekend","weekday"),
+                       levels = c("TRUE","FALSE"))
+summary(data2$Weekdays)                       
+```
+Let´s aggregate data into weekdays and time intervals.
+```{r}
+data3<-aggregate(list(Mean = data2$steps),
+                 by=list(interval=data2$interval,week=data2$Weekdays),
+                 FUN = mean)
+```
+
+Let´s make a plot using ggplot2
+```{r}
+library(ggplot2)
+ggplot(data3,aes(interval,Mean))+facet_wrap(week~.,nrow=2 )+geom_line()+
+labs(y = "Average Steps")
+
+        
+```
